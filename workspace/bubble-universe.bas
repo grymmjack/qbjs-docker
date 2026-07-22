@@ -1,4 +1,4 @@
-Const xmax = 1024, ymax = 1024
+Const xmax = 512, ymax = 512
 _Title "Bubble Universe - ESC to exit" ' from johnno at RCBasic forum 2022-11-14
 Screen _NewImage(xmax, ymax, 32)
 ' ---------------

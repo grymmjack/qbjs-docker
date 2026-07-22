@@ -87,6 +87,7 @@ permissions:
   contents: write      # releases
   pages: write         # GitHub Pages
   id-token: write      # Pages deploy
+  packages: read       # pull the toolchain image from GHCR
 jobs:
   build:
     uses: grymmjack/qbjs-docker/.github/workflows/reusable-build.yml@main

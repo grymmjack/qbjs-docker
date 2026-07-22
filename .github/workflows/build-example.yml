@@ -12,9 +12,10 @@ on:
 jobs:
   build:
     permissions:
-      contents: write
-      pages: write
-      id-token: write
+      contents: write     # create Releases on tags
+      pages: write        # deploy to GitHub Pages
+      id-token: write      # Pages deploy
+      packages: read      # pull the toolchain image from GHCR
     uses: ./.github/workflows/reusable-build.yml
     with:
       source-file: workspace/bubble-universe.bas
