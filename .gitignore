@@ -1,0 +1,26 @@
+# Build outputs
+dist/
+out/
+publish/
+build/
+workspace/program.js
+workspace/dist/
+*.zip
+*.tar.gz
+
+# Tauri scaffold/build workspaces created by qbjs-tauri.sh / make tauri*
+tauri-app/
+tauri-win/
+tauri-mac/
+
+# Native build artifacts
+**/target/
+**/node_modules/
+templates/tauri/src-tauri/icons/*.png
+templates/tauri/src-tauri/icons/*.ico
+templates/tauri/src-tauri/icons/*.icns
+templates/tauri/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db

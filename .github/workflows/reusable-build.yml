@@ -1,0 +1,259 @@
+name: QBJS Reusable Build
+
+# Drop-in workflow: from one .bas file, produce a web bundle (+ GitHub Pages),
+# native Tauri installers (Win/macOS/Linux), and native NW.js packages, and
+# attach everything to a GitHub Release when you push a version tag.
+
+on:
+  workflow_call:
+    inputs:
+      source-file:
+        description: 'Path to the .bas source file (relative to repo root)'
+        required: true
+        type: string
+      project-name:
+        description: 'App name (title, PWA manifest, artifact names)'
+        required: true
+        type: string
+      mode:
+        description: 'Loader style: auto or play'
+        required: false
+        default: 'auto'
+        type: string
+      qbjs-ref:
+        description: 'QBJS git ref to build with'
+        required: false
+        default: 'main'
+        type: string
+      deploy-pages:
+        description: 'Deploy the web bundle to GitHub Pages'
+        required: false
+        default: true
+        type: boolean
+      build-tauri:
+        description: 'Build native Tauri installers (Win/macOS/Linux)'
+        required: false
+        default: true
+        type: boolean
+      build-nwjs:
+        description: 'Build native NW.js packages (Win/macOS/Linux)'
+        required: false
+        default: true
+        type: boolean
+      nwjs-version:
+        description: 'NW.js runtime version for the NW.js packages'
+        required: false
+        default: '0.95.0'
+        type: string
+      tauri-identifier:
+        description: 'Reverse-domain app id for Tauri bundles'
+        required: false
+        default: ''
+        type: string
+
+env:
+  QBJS_IMAGE: ghcr.io/grymmjack/qbjs-docker:${{ inputs.qbjs-ref }}
+  TOOLS_REPO: grymmjack/qbjs-docker
+
+jobs:
+  # ------------------------------------------------------------------ web ----
+  web:
+    name: Web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build web bundle (Docker)
+        run: |
+          docker pull "$QBJS_IMAGE" || docker build \
+            --build-arg QBJS_REF=${{ inputs.qbjs-ref }} \
+            -t "$QBJS_IMAGE" "https://github.com/${TOOLS_REPO}.git#main"
+          docker run --rm -v "$(pwd):/workspace" --user "$(id -u):$(id -g)" \
+            "$QBJS_IMAGE" build "${{ inputs.source-file }}" \
+              --name "${{ inputs.project-name }}" \
+              --mode "${{ inputs.mode }}" --out dist
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.project-name }}-web
+          path: dist
+
+      - name: Upload Pages artifact
+        if: inputs.deploy-pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # ---------------------------------------------------------------- pages ----
+  pages:
+    name: Deploy to GitHub Pages
+    needs: web
+    if: inputs.deploy-pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  # ---------------------------------------------------------------- tauri ----
+  tauri:
+    name: Tauri (${{ matrix.rid }})
+    needs: web
+    if: inputs.build-tauri
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,  rid: linux }
+          - { os: macos-latest,  rid: macos }
+          - { os: windows-latest, rid: windows }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout tooling (templates)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TOOLS_REPO }}
+          path: .qbjs-tools
+
+      - name: Download web bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.project-name }}-web
+          path: dist
+
+      - name: Scaffold Tauri project (shared script)
+        shell: bash
+        run: |
+          # Same qbjs-tauri.sh used by `make tauri` locally -- single source of
+          # truth for the token substitution (esp. the semver version).
+          VER='0.1.0'
+          [[ "$GITHUB_REF" == refs/tags/v* ]] && VER="${GITHUB_REF_NAME#v}"
+          ARGS=(--dist dist --name "${{ inputs.project-name }}" --version "$VER" --out app)
+          [ -n "${{ inputs.tauri-identifier }}" ] && ARGS+=(--id "${{ inputs.tauri-identifier }}")
+          chmod +x .qbjs-tools/bin/qbjs-tauri.sh
+          QBJS_TEMPLATES=.qbjs-tools/templates .qbjs-tools/bin/qbjs-tauri.sh "${ARGS[@]}"
+          cat app/src-tauri/tauri.conf.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: Install Linux webview deps
+        if: matrix.rid == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libgtk-3-dev
+
+      - name: Install Tauri CLI, generate icons, build
+        working-directory: app
+        run: |
+          npm install
+          npm run tauri icon dist/logo-256.png
+          npm run tauri build
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p out
+          find app/src-tauri/target/release/bundle -type f \
+            \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.dmg' -o -name '*.app' -o -name '*.msi' \
+               -o -name '*.exe' \) -exec cp {} out/ \; || true
+          ls -la out
+
+      - name: Upload Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.project-name }}-tauri-${{ matrix.rid }}
+          path: out
+          if-no-files-found: warn
+
+  # ----------------------------------------------------------------- nwjs ----
+  nwjs:
+    name: NW.js packages
+    needs: web
+    if: inputs.build-nwjs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tooling
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TOOLS_REPO }}
+          path: .qbjs-tools
+
+      - name: Download web bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.project-name }}-web
+          path: dist
+
+      - name: Package NW.js (all platforms)
+        run: |
+          chmod +x .qbjs-tools/bin/qbjs-nwjs.sh
+          for plat in linux osx win; do
+            QBJS_TEMPLATES=.qbjs-tools/templates \
+            .qbjs-tools/bin/qbjs-nwjs.sh \
+              --dist dist --name "${{ inputs.project-name }}" \
+              --platform "$plat" --nwjs-version "${{ inputs.nwjs-version }}" \
+              --out out
+          done
+          ls -la out
+
+      - name: Upload NW.js artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.project-name }}-nwjs
+          path: out
+
+  # -------------------------------------------------------------- release ----
+  release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ web, tauri, nwjs ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Stage release files
+        run: |
+          mkdir -p release
+          # Zip the web bundle for convenient download.
+          if [ -d "artifacts/${{ inputs.project-name }}-web" ]; then
+            (cd "artifacts/${{ inputs.project-name }}-web" && zip -qr - .) \
+              > "release/${{ inputs.project-name }}-web.zip"
+          fi
+          # Flatten native artifacts.
+          find artifacts -type f \
+            \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \
+               -o -name '*.tar.gz' -o -name '*.zip' \) \
+            -exec cp {} release/ \; || true
+          ls -la release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

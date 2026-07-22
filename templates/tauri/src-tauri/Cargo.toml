@@ -1,0 +1,25 @@
+[package]
+name = "qbjs-app"
+version = "0.1.0"
+edition = "2021"
+description = "A QBJS application packaged as a native desktop app with Tauri."
+
+# The binary name; the user-facing product name comes from tauri.conf.json.
+[[bin]]
+name = "qbjs-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+# Small, fast release binaries (this is the modern NWJS alternative -- a few MB
+# vs NWJS's ~100MB, because Tauri uses the OS webview instead of bundling one).
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

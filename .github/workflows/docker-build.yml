@@ -1,0 +1,64 @@
+name: Build & Publish Docker Image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Dockerfile'
+      - 'bin/**'
+      - 'templates/**'
+      - '.github/workflows/docker-build.yml'
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      qbjs-ref:
+        description: 'QBJS git ref to build the image from'
+        required: false
+        default: 'main'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/qbjs-docker
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        run: |
+          QBJS_REF="${{ github.event.inputs.qbjs-ref }}"
+          QBJS_REF="${QBJS_REF:-main}"
+          echo "qbjs-ref=$QBJS_REF" >> "$GITHUB_OUTPUT"
+          TAGS="${IMAGE}:latest,${IMAGE}:${QBJS_REF}"
+          # Also publish the git tag on release tags (e.g. v1.0.0).
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAGS="${TAGS},${IMAGE}:${GITHUB_REF_NAME}"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            QBJS_REF=${{ steps.meta.outputs.qbjs-ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

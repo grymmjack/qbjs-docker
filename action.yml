@@ -1,0 +1,85 @@
+name: 'QBJS Build'
+description: 'Compile a QBJS BASIC program into a deployable, installable (PWA) static web bundle.'
+author: 'grymmjack'
+
+branding:
+  icon: 'play'
+  color: 'blue'
+
+inputs:
+  source-file:
+    description: 'Path to the .bas source file to compile (relative to working-directory)'
+    required: true
+  project-name:
+    description: 'App name (used for the title, PWA manifest, and artifacts)'
+    required: true
+  mode:
+    description: 'Loader style: auto (run on load) or play (click-to-start; use for audio)'
+    required: false
+    default: 'auto'
+  out-dir:
+    description: 'Output directory for the web bundle'
+    required: false
+    default: 'dist'
+  qbjs-ref:
+    description: 'QBJS git ref (branch, tag, or commit) to build with'
+    required: false
+    default: 'main'
+  pwa:
+    description: 'Include the PWA manifest + service worker (true/false)'
+    required: false
+    default: 'true'
+  working-directory:
+    description: 'Directory to run the build in'
+    required: false
+    default: '.'
+
+outputs:
+  bundle-path:
+    description: 'Path to the generated web bundle directory'
+    value: ${{ steps.build.outputs.bundle-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve QBJS image
+      id: image
+      shell: bash
+      run: |
+        IMAGE="ghcr.io/grymmjack/qbjs-docker:${{ inputs.qbjs-ref }}"
+        # Pull the prebuilt image; if unavailable, build it from this repo pinned
+        # to the requested QBJS ref.
+        if ! docker pull "$IMAGE" 2>/dev/null; then
+          echo "Prebuilt image not found; building locally..."
+          docker build \
+            --build-arg QBJS_REF=${{ inputs.qbjs-ref }} \
+            -t "$IMAGE" \
+            "https://github.com/grymmjack/qbjs-docker.git#main"
+        fi
+        echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+    - name: Build web bundle
+      id: build
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        PWA_FLAG=""
+        if [ "${{ inputs.pwa }}" != "true" ]; then PWA_FLAG="--no-pwa"; fi
+
+        docker run --rm \
+          -v "$(pwd):/workspace" \
+          --user "$(id -u):$(id -g)" \
+          "${{ steps.image.outputs.image }}" \
+          build "${{ inputs.source-file }}" \
+            --name "${{ inputs.project-name }}" \
+            --mode "${{ inputs.mode }}" \
+            --out "${{ inputs.out-dir }}" \
+            $PWA_FLAG
+
+        echo "bundle-path=${{ inputs.working-directory }}/${{ inputs.out-dir }}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload web bundle artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.project-name }}-web
+        path: ${{ inputs.working-directory }}/${{ inputs.out-dir }}

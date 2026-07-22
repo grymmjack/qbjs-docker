@@ -1,0 +1,30 @@
+# Convenience Compose file for local QBJS development.
+#
+#   docker compose build
+#   docker compose run --rm build workspace/bubble-universe.bas --name "Bubble Universe"
+#   docker compose up serve          # then open http://localhost:8080
+services:
+  # One-shot: compile + assemble the web bundle into ./workspace/dist
+  build:
+    build:
+      context: .
+      args:
+        QBJS_REF: ${QBJS_REF:-main}
+    image: qbjs-docker:local
+    volumes:
+      - ./workspace:/workspace
+    entrypoint: ["/opt/qbjs-tools/bin/entrypoint.sh", "build"]
+    command: ["bubble-universe.bas", "--name", "Bubble Universe"]
+
+  # Long-running: serve a previously built bundle at http://localhost:8080
+  serve:
+    image: qbjs-docker:local
+    build:
+      context: .
+      args:
+        QBJS_REF: ${QBJS_REF:-main}
+    volumes:
+      - ./workspace/dist:/app
+    ports:
+      - "8080:8080"
+    command: ["serve", "/app", "8080"]

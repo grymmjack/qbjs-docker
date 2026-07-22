@@ -1,0 +1,24 @@
+{
+  "name": "{{APP_NAME}}",
+  "short_name": "{{APP_NAME}}",
+  "description": "A QBJS application.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#0000aa",
+  "icons": [
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "48x48"
+    },
+    {
+      "src": "logo-256.png",
+      "type": "image/png",
+      "sizes": "256x256",
+      "purpose": "any maskable"
+    }
+  ]
+}

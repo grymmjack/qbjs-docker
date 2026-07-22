@@ -1,0 +1,25 @@
+name: Build Example App
+
+# Demonstrates the reusable workflow on this repo's own sample program.
+# Copy this pattern into YOUR QBJS project's .github/workflows/build.yml
+# (changing `uses:` to grymmjack/qbjs-docker/.github/workflows/reusable-build.yml@main).
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'example-v*' ]
+
+jobs:
+  build:
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      source-file: workspace/bubble-universe.bas
+      project-name: Bubble Universe
+      mode: auto
+      deploy-pages: false   # this toolchain repo doesn't host the example on Pages
+      build-tauri: true
+      build-nwjs: true

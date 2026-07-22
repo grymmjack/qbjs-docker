@@ -1,0 +1,12 @@
+{
+  "name": "qbjs-tauri-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native desktop wrapper (Tauri v2) for a QBJS web bundle.",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

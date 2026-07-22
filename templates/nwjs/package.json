@@ -1,0 +1,13 @@
+{
+  "name": "qbjs-app",
+  "version": "1.0.0",
+  "main": "index.html",
+  "window": {
+    "title": "{{APP_NAME}}",
+    "icon": "logo.png",
+    "width": 800,
+    "height": 600,
+    "resizable": true,
+    "frame": true
+  }
+}

@@ -1,0 +1,74 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build image & test pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the QBJS image
+        run: docker build --build-arg QBJS_REF=main -t qbjs-docker:test .
+
+      - name: version
+        run: docker run --rm qbjs-docker:test version
+
+      - name: Compile-only (hello.bas)
+        run: |
+          docker run --rm -v "$(pwd)/workspace:/workspace" \
+            qbjs-docker:test compile hello.bas program.js
+          test -s workspace/program.js
+          grep -q "__qbjs_run" workspace/program.js
+
+      - name: Integer division regression (\ needs the func_Abs fix)
+        run: |
+          printf 'Dim x As Integer\nx = 10 \\ 3\nPrint x\n' > workspace/intdiv.bas
+          docker run --rm -v "$(pwd)/workspace:/workspace" \
+            qbjs-docker:test compile intdiv.bas intdiv.js
+          node --check workspace/intdiv.js
+          echo "OK: integer division compiled"
+
+      - name: Build web bundle (bubble-universe.bas)
+        run: |
+          docker run --rm -v "$(pwd)/workspace:/workspace" --user "$(id -u):$(id -g)" \
+            qbjs-docker:test build bubble-universe.bas --name "Bubble Universe"
+          echo "--- bundle contents ---"
+          ls -R workspace/dist
+          # Required runtime files
+          for f in index.html program.js qb.js vfs.js gx/gx.js manifest.json service-worker.js; do
+            test -f "workspace/dist/$f" || { echo "MISSING: $f"; exit 1; }
+          done
+          # App name injected
+          grep -q "Bubble Universe" workspace/dist/index.html
+          # program.js is valid JS
+          node --check workspace/dist/program.js
+          # sanity: the bundle must be small (no tree/artifact leakage)
+          KB=$(du -sk workspace/dist | cut -f1)
+          test "$KB" -lt 5120 || { echo "bundle too large (${KB}KB) -- asset leak?"; exit 1; }
+          echo "bundle size: ${KB}KB"
+
+      - name: Compile error must fail the build (exit != 0)
+        run: |
+          printf 'Import Nope From "no/such/file.bas"\nPrint 1\n' > workspace/broken.bas
+          if docker run --rm -v "$(pwd)/workspace:/workspace" \
+               qbjs-docker:test compile broken.bas out.js; then
+            echo "ERROR: broken build unexpectedly succeeded"; exit 1
+          else
+            echo "OK: broken build failed as expected"
+          fi
+
+      - name: Serve the bundle and fetch it
+        run: |
+          docker run --rm -d -p 8080:8080 -v "$(pwd)/workspace/dist:/app" \
+            --name qbjs-serve qbjs-docker:test serve /app 8080
+          sleep 2
+          curl -fsS http://localhost:8080/ -o /dev/null && echo "OK: index served"
+          curl -fsS http://localhost:8080/program.js -o /dev/null && echo "OK: program served"
+          curl -fsS http://localhost:8080/manifest.json -o /dev/null && echo "OK: manifest served"
+          docker rm -f qbjs-serve

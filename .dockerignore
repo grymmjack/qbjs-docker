@@ -1,0 +1,13 @@
+.git
+.github
+docs
+workspace/dist
+workspace/*.js
+**/node_modules
+**/dist
+**/target
+*.zip
+*.tar.gz
+README.md
+CHANGELOG.md
+LICENSE

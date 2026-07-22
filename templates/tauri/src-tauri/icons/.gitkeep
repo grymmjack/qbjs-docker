@@ -1,0 +1,2 @@
+Icons are generated here by `npm run tauri icon <path-to-square-png>`.
+In CI, the reusable workflow runs this from your app's logo-256.png.
