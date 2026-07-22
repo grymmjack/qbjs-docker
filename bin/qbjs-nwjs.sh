@@ -64,8 +64,13 @@ sed "s/{{APP_NAME}}/$(printf '%s' "$NAME" | sed 's/[&/\\]/\\&/g')/g" \
 ( cd "$APPSTAGE" && zip -qr "$WORK/package.nw" . )
 
 # 2) Download + extract the NW.js runtime.
+# NW.js doesn't publish every arch for every OS (e.g. it ships osx-arm64 but no
+# linux-arm64 / win-arm64). Skip gracefully rather than fail the whole build.
 echo "==> Downloading $NW_URL"
-curl -fL "$NW_URL" -o "$WORK/nw.$EXT"
+if ! curl -fL "$NW_URL" -o "$WORK/nw.$EXT"; then
+  echo "qbjs-nwjs: NW.js has no ${PLATFORM}/${ARCH} runtime at v${NWJS_VERSION} -- skipping." >&2
+  exit 0
+fi
 if [ "$EXT" = "tar.gz" ]; then tar -xzf "$WORK/nw.$EXT" -C "$WORK";
 else unzip -q "$WORK/nw.$EXT" -d "$WORK"; fi
 NWDIR="$WORK/$NW_PKG"

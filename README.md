@@ -177,10 +177,14 @@ OS **and** architecture on a tag push:
 | OS | Arch | Tauri | NW.js | Where |
 |----|------|-------|-------|-------|
 | 🐧 Linux | x64 | `.deb` `.rpm` `.AppImage` | `.tar.gz` | `ubuntu` runner / local |
-| 🐧 Linux | **arm64** | `.deb` `.rpm` `.AppImage` | `.tar.gz` | `ubuntu-24.04-arm` runner |
+| 🐧 Linux | **arm64** | `.deb` `.rpm` `.AppImage` | — ¹ | `ubuntu-24.04-arm` runner |
 | 🍎 macOS | **universal** (Intel + Apple Silicon) | `_universal.dmg` | x64 + arm64 `.tar.gz` | `macos` runner |
 | 🪟 Windows | x64 | `-setup.exe` + `.msi` | `.zip` | `windows` runner / local |
-| 🪟 Windows | **arm64** | `-setup.exe` | `.zip` | cargo-xwin (Linux) |
+| 🪟 Windows | **arm64** | `-setup.exe` | — ¹ | cargo-xwin (Linux) |
+
+¹ NW.js only publishes an ARM64 runtime for **macOS** — there's no upstream `linux-arm64`
+or `win-arm64` NW.js build, so ARM Linux/Windows are Tauri-only. The packager skips
+unavailable arch/OS combos automatically.
 
 Locally on an x86 Linux box you can build everything except native macOS and Linux-ARM64:
 
