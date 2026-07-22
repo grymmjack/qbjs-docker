@@ -3,24 +3,48 @@ name: Build Example App
 # Demonstrates the reusable workflow on this repo's own sample program.
 # Copy this pattern into YOUR QBJS project's .github/workflows/build.yml
 # (changing `uses:` to grymmjack/qbjs-docker/.github/workflows/reusable-build.yml@main).
+#
+#  - Push a v* tag        -> builds ALL targets and publishes a Release.
+#  - Run manually (Actions -> "Build Example App" -> Run workflow) -> tick only the
+#    targets you want, so you can test one quickly instead of the full ~25 min matrix.
 
 on:
   workflow_dispatch:
+    inputs:
+      build-tauri:
+        description: 'Tauri (Linux/macOS/Windows, x64+arm64)'
+        type: boolean
+        default: true
+      build-electron:
+        description: 'Electron (Linux/macOS/Windows)'
+        type: boolean
+        default: true
+      build-nwjs:
+        description: 'NW.js packages'
+        type: boolean
+        default: true
+      deploy-pages:
+        description: 'Deploy the web bundle to GitHub Pages'
+        type: boolean
+        default: false
   push:
-    tags: [ 'v*' ]        # a version tag builds all platforms AND publishes a Release
+    tags: [ 'v*' ]        # a version tag builds all targets AND publishes a Release
 
 jobs:
   build:
     permissions:
       contents: write     # create Releases on tags
       pages: write        # deploy to GitHub Pages
-      id-token: write      # Pages deploy
+      id-token: write     # Pages deploy
       packages: read      # pull the toolchain image from GHCR
     uses: ./.github/workflows/reusable-build.yml
     with:
       source-file: workspace/bubble-universe.bas
       project-name: Bubble Universe
       mode: auto
-      deploy-pages: false   # this toolchain repo doesn't host the example on Pages
-      build-tauri: true
-      build-nwjs: true
+      # On a tag push, build everything. On a manual run, honor the checkboxes
+      # (web always builds -- the native jobs depend on it).
+      build-tauri: ${{ github.event_name != 'workflow_dispatch' || inputs.build-tauri }}
+      build-electron: ${{ github.event_name != 'workflow_dispatch' || inputs.build-electron }}
+      build-nwjs: ${{ github.event_name != 'workflow_dispatch' || inputs.build-nwjs }}
+      deploy-pages: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy-pages }}

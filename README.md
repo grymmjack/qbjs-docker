@@ -128,24 +128,65 @@ docker compose up serve      # http://localhost:8080
 
 ### One-command builds with `make`
 
-Every target is a single command (override `SRC=` / `NAME=` as needed):
+Every target is a single command. Override `SRC=` / `NAME=` as needed
+(e.g. `make electron SRC=workspace/bubble-universe.bas NAME="Bubble Universe"`).
 
-```bash
-make help                                   # list targets
-make web   SRC=workspace/bubble-universe.bas NAME="Bubble Universe"   # -> ./dist (web bundle + PWA)
-make serve                                  # http://localhost:8080
-make tauri                                  # native Linux desktop app (installs deps, builds)
-make tauri-win                              # cross-compile Windows .exe + installer
-make run-tauri        / run-tauri-win       # launch a built app (Windows via wine)
-make open-tauri       / open-tauri-win      # reveal the installers in your file manager
-make nwjs                                    # native NW.js packages (Win/macOS/Linux)
-make test                                   # end-to-end pipeline check
-make clean
-```
+**Build & serve**
 
-`make tauri` runs the web build, installs the Linux webview deps (via `make tauri-deps`,
-uses `sudo`), scaffolds the Tauri project, and compiles the native binary — no manual steps.
-Requires Rust ([rustup.rs](https://rustup.rs)) and Node.
+| Target | Description |
+|--------|-------------|
+| `make image` (`build`) | Build the Docker toolchain image |
+| `make web` | Compile `SRC` → web bundle + PWA → `./dist` |
+| `make serve` | Serve the bundle at `http://localhost:8080` |
+| `make compile` | Transpile `SRC` → JavaScript only |
+| `make demo` | Build the sample and serve it |
+
+**Native desktop — Tauri** (tiny, OS webview)
+
+| Target | Description |
+|--------|-------------|
+| `make tauri` | Tauri app for this OS (Linux) → `./tauri-app` |
+| `make tauri-win` / `tauri-win-arm` | Windows x64 / ARM64 via cargo-xwin |
+| `make tauri-mac` | macOS (explains: build on a Mac / CI) |
+| `make tauri-all` | Linux + Windows Tauri |
+| `make tauri-deps` / `tauri-win-deps` | Install system deps (uses `sudo`) |
+
+**Native desktop — Electron** (bundled Chromium, best installers)
+
+| Target | Description |
+|--------|-------------|
+| `make electron` | Linux x64 + arm64 (AppImage + deb) → `./electron-app/release` |
+| `make electron-win` | Windows nsis (needs `wine` locally) |
+| `make electron-mac` | macOS (explains: build on a Mac / CI) |
+
+**Native desktop — NW.js** (bundled Chromium, legacy)
+
+| Target | Description |
+|--------|-------------|
+| `make nwjs` | x64 packages (Linux/macOS/Windows) → `./out` |
+| `make nwjs-arm` | arm64 packages (macOS only upstream) |
+
+**Run & reveal builds**
+
+| Target | Description |
+|--------|-------------|
+| `make run-tauri` / `run-electron` / `run-nwjs-linux` | Launch a built Linux app |
+| `make run-tauri-win` / `run-nwjs-win` | Launch a Windows build via wine |
+| `make open-tauri` / `open-electron` / `open-nwjs` / `open-dist` | Reveal outputs in your file manager |
+| `make webview2-wine` | (experimental) install WebView2 into your wine prefix |
+
+**Everything & maintenance**
+
+| Target | Description |
+|--------|-------------|
+| `make all` | Everything buildable on this host (macOS → CI) |
+| `make test` | End-to-end pipeline check |
+| `make clean` / `clean-docker` | Remove build artifacts / the Docker image |
+| `make push` | Tag & push the image to GHCR |
+
+`make tauri`/`make electron` run the web build first, install their deps, scaffold the
+project, and build — no manual steps. Tauri needs Rust ([rustup.rs](https://rustup.rs)) + Node;
+Electron needs Node.
 
 ## 🧰 Image commands
 
