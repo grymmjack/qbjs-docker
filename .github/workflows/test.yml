@@ -19,10 +19,10 @@ jobs:
       - name: version
         run: docker run --rm qbjs-docker:test version
 
-      - name: Compile-only (hello.bas)
+      - name: Compile-only (bubble-universe.bas)
         run: |
           docker run --rm -v "$(pwd)/workspace:/workspace" \
-            qbjs-docker:test compile hello.bas program.js
+            qbjs-docker:test compile bubble-universe.bas program.js
           test -s workspace/program.js
           grep -q "__qbjs_run" workspace/program.js
 

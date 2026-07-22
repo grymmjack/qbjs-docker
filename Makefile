@@ -1,4 +1,4 @@
-.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-mac tauri-all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win webview2-wine open open-tauri open-tauri-win open-nwjs open-dist nwjs demo test clean clean-docker push
+.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win webview2-wine open open-tauri open-tauri-win open-nwjs open-dist nwjs demo test clean clean-docker push
 
 # ---- Config (override on the command line, e.g. `make tauri SRC=my.bas NAME="My App"`) ----
 IMAGE       := qbjs-docker
@@ -86,8 +86,17 @@ tauri-mac: ## macOS build (cannot cross-compile from Linux -- use CI)
 	@echo "Use the CI matrix: push a tag and reusable-build.yml builds the .dmg on a macos runner,"
 	@echo "exactly like your DRAW build-release.yml does. Or run 'make tauri' on a Mac."
 
-tauri-all: tauri tauri-win ## Build every target buildable locally (Linux + Windows); macOS via CI
-	@echo "Built Linux + Windows locally. macOS -> CI (see 'make tauri-mac')."
+tauri-all: tauri tauri-win ## Build both native Tauri targets locally (Linux + Windows)
+	@echo "Built Linux + Windows Tauri locally. macOS -> CI (see 'make tauri-mac')."
+
+all: tauri tauri-win nwjs ## Build EVERYTHING buildable locally (web + Linux/Win desktop + NW.js); macOS via CI
+	@echo ""
+	@echo "== Built locally: =="
+	@echo "  web bundle     -> ./$(DIST)"
+	@echo "  Linux Tauri    -> $(LINUX_BUNDLE)/"
+	@echo "  Windows Tauri  -> $(WIN_BUNDLE)/"
+	@echo "  NW.js (Lin/Win/Mac, repackaged) -> ./$(NWJS_OUT)/"
+	@echo "  Native macOS Tauri -> CI only (see 'make tauri-mac')"
 
 # ---- run: launch a built binary ------------------------------------------
 run-tauri: ## Run the Linux Tauri app
