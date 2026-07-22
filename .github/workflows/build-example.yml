@@ -7,7 +7,7 @@ name: Build Example App
 on:
   workflow_dispatch:
   push:
-    tags: [ 'example-v*' ]
+    tags: [ 'v*' ]        # a version tag builds all platforms AND publishes a Release
 
 jobs:
   build:
