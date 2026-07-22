@@ -25,6 +25,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "10.13"
+    },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"

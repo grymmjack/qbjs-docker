@@ -71,8 +71,18 @@ else unzip -q "$WORK/nw.$EXT" -d "$WORK"; fi
 NWDIR="$WORK/$NW_PKG"
 [ -d "$NWDIR" ] || die "unexpected NW.js archive layout: $NWDIR not found"
 
-# 3) Drop package.nw next to the nw binary (auto-loaded at launch).
-cp "$WORK/package.nw" "$NWDIR/package.nw"
+# 3) Install the app so NW.js auto-loads it. This differs by platform:
+#    - Linux/Windows: a "package.nw" next to the nw executable is auto-loaded.
+#    - macOS: NW.js loads the app from INSIDE the bundle, at
+#      nwjs.app/Contents/Resources/app.nw -- a top-level package.nw is ignored
+#      (which is why a mis-placed one launches NW.js's default welcome app).
+if [ "$PLATFORM" = "osx" ]; then
+  APP_RES="$NWDIR/nwjs.app/Contents/Resources"
+  [ -d "$APP_RES" ] || die "unexpected macOS NW.js layout: $APP_RES not found"
+  cp "$WORK/package.nw" "$APP_RES/app.nw"
+else
+  cp "$WORK/package.nw" "$NWDIR/package.nw"
+fi
 
 # 4) Archive the runnable app directory.
 SAFE_NAME="$(printf '%s' "$NAME" | tr ' ' '-' | tr -cd '[:alnum:]._-')"

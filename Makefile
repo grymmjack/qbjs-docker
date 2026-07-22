@@ -1,4 +1,4 @@
-.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win webview2-wine open open-tauri open-tauri-win open-nwjs open-dist nwjs demo test clean clean-docker push
+.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-win-arm tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win webview2-wine open open-tauri open-tauri-win open-nwjs open-dist nwjs nwjs-arm demo test clean clean-docker push
 
 # ---- Config (override on the command line, e.g. `make tauri SRC=my.bas NAME="My App"`) ----
 IMAGE       := qbjs-docker
@@ -76,10 +76,18 @@ tauri-win-deps: ## Install the LLVM cross toolchain for Windows builds (sudo; id
 	  sudo apt-get update && sudo apt-get install -y clang lld llvm nsis; \
 	fi
 
-tauri-win: web tauri-win-deps ## Cross-compile a Windows Tauri .exe/.msi from Linux (cargo-xwin)
+tauri-win: web tauri-win-deps ## Cross-compile a Windows x64 Tauri app from Linux (cargo-xwin)
 	@command -v cargo >/dev/null || { echo "Rust not found. Install: https://rustup.rs"; exit 1; }
 	QBJS_TEMPLATES=templates bin/qbjs-tauri.sh \
 	  --dist "$(DIST)" --name "$(NAME)" --out tauri-win --target $(WIN_TARGET) --build
+
+WIN_ARM_TARGET := aarch64-pc-windows-msvc
+
+tauri-win-arm: web tauri-win-deps ## Cross-compile a Windows ARM64 Tauri app from Linux (cargo-xwin)
+	@command -v cargo >/dev/null || { echo "Rust not found. Install: https://rustup.rs"; exit 1; }
+	rustup target add $(WIN_ARM_TARGET) 2>/dev/null || true
+	QBJS_TEMPLATES=templates bin/qbjs-tauri.sh \
+	  --dist "$(DIST)" --name "$(NAME)" --out tauri-win-arm --target $(WIN_ARM_TARGET) --build
 
 tauri-mac: ## macOS build (cannot cross-compile from Linux -- use CI)
 	@echo "macOS binaries cannot be built from Linux (Apple SDK + signing are macOS-only)."
@@ -89,14 +97,15 @@ tauri-mac: ## macOS build (cannot cross-compile from Linux -- use CI)
 tauri-all: tauri tauri-win ## Build both native Tauri targets locally (Linux + Windows)
 	@echo "Built Linux + Windows Tauri locally. macOS -> CI (see 'make tauri-mac')."
 
-all: tauri tauri-win nwjs ## Build EVERYTHING buildable locally (web + Linux/Win desktop + NW.js); macOS via CI
+all: tauri tauri-win tauri-win-arm nwjs nwjs-arm ## Build EVERYTHING buildable on this x86 Linux host; macOS + Linux-ARM via CI
 	@echo ""
-	@echo "== Built locally: =="
-	@echo "  web bundle     -> ./$(DIST)"
-	@echo "  Linux Tauri    -> $(LINUX_BUNDLE)/"
-	@echo "  Windows Tauri  -> $(WIN_BUNDLE)/"
-	@echo "  NW.js (Lin/Win/Mac, repackaged) -> ./$(NWJS_OUT)/"
-	@echo "  Native macOS Tauri -> CI only (see 'make tauri-mac')"
+	@echo "== Built locally (x86 Linux): =="
+	@echo "  web bundle            -> ./$(DIST)"
+	@echo "  Linux x64 Tauri       -> $(LINUX_BUNDLE)/"
+	@echo "  Windows x64 Tauri     -> $(WIN_BUNDLE)/"
+	@echo "  Windows ARM64 Tauri   -> tauri-win-arm/src-tauri/target/$(WIN_ARM_TARGET)/release/bundle/"
+	@echo "  NW.js x64 + arm64 (Lin/Mac/Win) -> ./$(NWJS_OUT)/"
+	@echo "  CI only: macOS universal .dmg, Linux ARM64 Tauri (see 'make tauri-mac')"
 
 # ---- run: launch a built binary ------------------------------------------
 run-tauri: ## Run the Linux Tauri app
@@ -163,10 +172,18 @@ open-dist: ## Open the web bundle folder
 
 open: open-tauri ## Alias for open-tauri
 
-nwjs: web ## Build native NW.js packages (all platforms) -> ./out
+nwjs: web ## Build native NW.js x64 packages (Linux/macOS/Windows) -> ./out
 	@for plat in linux osx win; do \
 	  QBJS_TEMPLATES=templates bin/qbjs-nwjs.sh \
-	    --dist "$(DIST)" --name "$(NAME)" --platform $$plat \
+	    --dist "$(DIST)" --name "$(NAME)" --platform $$plat --arch x64 \
+	    --nwjs-version "$(NWJS_VERSION)" --out out; \
+	done
+	@ls -lh out
+
+nwjs-arm: web ## Build native NW.js ARM64 packages (Linux/macOS/Windows) -> ./out
+	@for plat in linux osx win; do \
+	  QBJS_TEMPLATES=templates bin/qbjs-nwjs.sh \
+	    --dist "$(DIST)" --name "$(NAME)" --platform $$plat --arch arm64 \
 	    --nwjs-version "$(NWJS_VERSION)" --out out; \
 	done
 	@ls -lh out

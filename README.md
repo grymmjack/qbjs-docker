@@ -169,27 +169,39 @@ Both native paths wrap the **same** `dist/` bundle:
 Change window title/size/fullscreen in `templates/tauri/src-tauri/tauri.conf.json` or
 `templates/nwjs/package.json`.
 
-### Cross-platform targets
+### Cross-platform targets (x64 + ARM64)
 
-| Target | How | Local from Linux? |
-|--------|-----|-------------------|
-| 🌐 **Web** | `make web` — one bundle runs on every OS/browser | ✅ universal |
-| 🐧 **Linux** | `make tauri` (Tauri) / `make nwjs` (NWJS) | ✅ native |
-| 🪟 **Windows** | `make tauri-win` — Tauri via [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin), producing a `.exe` + NSIS `-setup.exe` (a `.msi` needs a Windows host → use CI); NWJS via `qbjs-nwjs.sh --platform win` | ✅ cross-compiles |
-| 🍎 **macOS** | `make tauri-mac` explains it: **CI only** — Apple's SDK & signing are macOS-only. NWJS `.tar.gz` still cross-packs from Linux. | ⚠️ use CI runner |
+The CI matrix ([`reusable-build.yml`](.github/workflows/reusable-build.yml)) builds every
+OS **and** architecture on a tag push:
 
-**The robust way to get signed installers for all three OSes is the CI matrix** —
-[`reusable-build.yml`](.github/workflows/reusable-build.yml) runs Tauri on
-`ubuntu-latest` / `macos-latest` / `windows-latest` (native runners), exactly like a
-per-OS `build-linux` / `build-macos` / `build-windows` job layout. Push a tag → a Release
-with `.AppImage`/`.deb`, `.dmg`, and `.msi`/`.exe`.
+| OS | Arch | Tauri | NW.js | Where |
+|----|------|-------|-------|-------|
+| 🐧 Linux | x64 | `.deb` `.rpm` `.AppImage` | `.tar.gz` | `ubuntu` runner / local |
+| 🐧 Linux | **arm64** | `.deb` `.rpm` `.AppImage` | `.tar.gz` | `ubuntu-24.04-arm` runner |
+| 🍎 macOS | **universal** (Intel + Apple Silicon) | `_universal.dmg` | x64 + arm64 `.tar.gz` | `macos` runner |
+| 🪟 Windows | x64 | `-setup.exe` + `.msi` | `.zip` | `windows` runner / local |
+| 🪟 Windows | **arm64** | `-setup.exe` | `.zip` | cargo-xwin (Linux) |
+
+Locally on an x86 Linux box you can build everything except native macOS and Linux-ARM64:
 
 ```bash
-make tauri        # Linux desktop app, here and now
-make tauri-win    # Windows .exe/.msi, cross-compiled from Linux
-make tauri-all    # Linux + Windows locally (macOS -> CI)
-make nwjs         # NWJS packages for Linux + Windows + macOS (repackaged, from Linux)
+make tauri          # Linux x64 desktop app
+make tauri-win      # Windows x64  (cargo-xwin)
+make tauri-win-arm  # Windows ARM64 (cargo-xwin)
+make nwjs           # NW.js x64  (Linux/macOS/Windows)
+make nwjs-arm       # NW.js ARM64 (Linux/macOS/Windows)
+make all            # everything buildable here; macOS + Linux-ARM64 -> CI
 ```
+
+> **`aarch64` = Apple Silicon.** The macOS build is **universal**, so one `.dmg` runs on
+> both Intel and Apple Silicon — no separate Intel build needed.
+>
+> **macOS "app is damaged"?** These are ad-hoc signed but not notarized. Right-click the
+> app → **Open**, or clear quarantine: `xattr -cr "/Applications/Your App.app"`. (Ad-hoc
+> signing is what keeps Apple Silicon builds from being rejected outright.)
+>
+> **ARM Linux runners** are free for public repos; private repos need a paid plan for
+> `ubuntu-24.04-arm` (that one matrix leg will queue/fail until the repo is public).
 
 > **Homebrew users:** if `pkg-config` resolves to `/home/linuxbrew/...`, it won't see the
 > system GTK/WebKit libs and the Tauri build fails with `gdk-3.0 not found`. `qbjs-tauri.sh`

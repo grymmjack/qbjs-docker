@@ -131,10 +131,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-22.04,  rid: linux }
-          - { os: macos-latest,  rid: macos }
-          - { os: windows-latest, rid: windows }
+          # native x64 builds
+          - { os: ubuntu-22.04,     rid: linux-x64,       target: '',                      runner: '',         deps: linux, rust-targets: '',                                          optional: false }
+          - { os: windows-latest,   rid: windows-x64,     target: '',                      runner: '',         deps: none,  rust-targets: '',                                          optional: false }
+          # macOS: ONE universal .dmg for both Intel + Apple Silicon
+          - { os: macos-latest,     rid: macos-universal, target: universal-apple-darwin,  runner: '',         deps: mac,   rust-targets: 'x86_64-apple-darwin,aarch64-apple-darwin',  optional: false }
+          # native ARM64 Linux (needs an ARM runner: free on public repos, paid on private)
+          - { os: ubuntu-24.04-arm, rid: linux-arm64,     target: '',                      runner: '',         deps: linux, rust-targets: '',                                          optional: true }
+          # Windows ARM64, cross-compiled from Linux via cargo-xwin
+          - { os: ubuntu-22.04,     rid: windows-arm64,   target: aarch64-pc-windows-msvc, runner: cargo-xwin, deps: xwin,  rust-targets: 'aarch64-pc-windows-msvc',                   optional: true }
     runs-on: ${{ matrix.os }}
+    # Optional legs (ARM) must not block the Release when a runner is unavailable.
+    continue-on-error: ${{ matrix.optional }}
     steps:
       - name: Checkout tooling (templates)
         uses: actions/checkout@v4
@@ -168,34 +176,51 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri
+          key: ${{ matrix.rid }}
 
       - name: Install Linux webview deps
-        if: matrix.rid == 'linux'
+        if: matrix.deps == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
             librsvg2-dev patchelf libgtk-3-dev
 
-      - name: Install Tauri CLI, generate icons, build
+      - name: Install Windows cross toolchain (cargo-xwin)
+        if: matrix.deps == 'xwin'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm nsis
+          cargo install --locked cargo-xwin
+
+      - name: Build
         working-directory: app
+        shell: bash
         run: |
           npm install
           npm run tauri icon dist/logo-256.png
-          npm run tauri build
+          ARGS=""
+          [ -n "${{ matrix.runner }}" ] && ARGS="--runner ${{ matrix.runner }}"
+          [ -n "${{ matrix.target }}" ] && ARGS="$ARGS --target ${{ matrix.target }}"
+          echo "==> tauri build -- $ARGS"
+          npm run tauri build -- $ARGS
 
       - name: Collect installers
         shell: bash
         run: |
           mkdir -p out
-          find app/src-tauri/target/release/bundle -type f \
+          T="${{ matrix.target }}"
+          BUNDLE="app/src-tauri/target/${T:+$T/}release/bundle"
+          find "$BUNDLE" -type f \
             \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
-               -o -name '*.dmg' -o -name '*.app' -o -name '*.msi' \
-               -o -name '*.exe' \) -exec cp {} out/ \; || true
+               -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) \
+            -exec cp {} out/ \; || true
           ls -la out
 
       - name: Upload Tauri artifacts
@@ -224,14 +249,17 @@ jobs:
           name: ${{ inputs.project-name }}-web
           path: dist
 
-      - name: Package NW.js (all platforms)
+      - name: Package NW.js (all platforms x64 + arm64)
         run: |
           chmod +x .qbjs-tools/bin/qbjs-nwjs.sh
-          for plat in linux osx win; do
+          for combo in "linux x64" "linux arm64" "osx x64" "osx arm64" "win x64" "win arm64"; do
+            set -- $combo
+            echo "==> NW.js $1/$2"
             QBJS_TEMPLATES=.qbjs-tools/templates \
             .qbjs-tools/bin/qbjs-nwjs.sh \
               --dist dist --name "${{ inputs.project-name }}" \
-              --platform "$plat" --nwjs-version "${{ inputs.nwjs-version }}" \
+              --platform "$1" --arch "$2" \
+              --nwjs-version "${{ inputs.nwjs-version }}" \
               --out out
           done
           ls -la out
@@ -277,3 +305,20 @@ jobs:
         with:
           files: release/*
           generate_release_notes: true
+          append_body: true
+          body: |
+            ### Install notes
+
+            **macOS** — these builds are ad-hoc signed, not notarized (no paid Apple
+            Developer account). On first launch macOS may say the app is from an
+            unidentified developer. Either **right-click the app → Open**, or clear the
+            download quarantine:
+            ```sh
+            xattr -cr "/Applications/${{ inputs.project-name }}.app"
+            ```
+            The `*_universal.dmg` runs on both Intel and Apple Silicon.
+
+            **Windows** — use the `*-setup.exe` (or `.msi`). Windows 11 / updated Win10
+            already include WebView2; the installer provisions it otherwise.
+
+            **NW.js** packages are larger but fully self-contained (bundled Chromium).
