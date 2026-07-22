@@ -60,14 +60,34 @@ jobs:
   web:
     name: Web bundle
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
+      # Needed to pull the (possibly private) toolchain image from GHCR.
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build web bundle (Docker)
         run: |
-          docker pull "$QBJS_IMAGE" || docker build \
-            --build-arg QBJS_REF=${{ inputs.qbjs-ref }} \
-            -t "$QBJS_IMAGE" "https://github.com/${TOOLS_REPO}.git#main"
+          # Prefer the published image; fall back to building from THIS checkout
+          # (works when the caller repo is the toolchain repo itself, and avoids
+          # needing git auth for a private remote).
+          if ! docker pull "$QBJS_IMAGE"; then
+            if [ -f Dockerfile ]; then
+              echo "Image unavailable; building from local checkout..."
+              docker build --build-arg QBJS_REF=${{ inputs.qbjs-ref }} -t "$QBJS_IMAGE" .
+            else
+              echo "::error::Cannot pull $QBJS_IMAGE and no local Dockerfile. Make the qbjs-docker package public, or grant this repo package read access."
+              exit 1
+            fi
+          fi
           docker run --rm -v "$(pwd):/workspace" --user "$(id -u):$(id -g)" \
             "$QBJS_IMAGE" build "${{ inputs.source-file }}" \
               --name "${{ inputs.project-name }}" \
