@@ -129,8 +129,11 @@ Every target is a single command (override `SRC=` / `NAME=` as needed):
 make help                                   # list targets
 make web   SRC=workspace/bubble-universe.bas NAME="Bubble Universe"   # -> ./dist (web bundle + PWA)
 make serve                                  # http://localhost:8080
-make tauri NAME="Demo"                      # native desktop app (installs deps, builds)
-make nwjs  NAME="Demo"                       # native NW.js packages (Win/macOS/Linux)
+make tauri                                  # native Linux desktop app (installs deps, builds)
+make tauri-win                              # cross-compile Windows .exe + installer
+make run-tauri        / run-tauri-win       # launch a built app (Windows via wine)
+make open-tauri       / open-tauri-win      # reveal the installers in your file manager
+make nwjs                                    # native NW.js packages (Win/macOS/Linux)
 make test                                   # end-to-end pipeline check
 make clean
 ```
@@ -190,6 +193,26 @@ make nwjs         # NWJS packages for Linux + Windows + macOS (repackaged, from 
 > **Homebrew users:** if `pkg-config` resolves to `/home/linuxbrew/...`, it won't see the
 > system GTK/WebKit libs and the Tauri build fails with `gdk-3.0 not found`. `qbjs-tauri.sh`
 > handles this automatically by adding the system pkg-config dirs to `PKG_CONFIG_PATH`.
+
+### Running & revealing your builds
+
+```bash
+make run-tauri          # run the Linux Tauri app
+make run-tauri-win      # run the Windows .exe (via wine; see WebView2 note below)
+make run-nwjs-linux     # extract + run the Linux NW.js package
+make run-nwjs-win       # run the Windows NW.js package under wine (self-contained)
+make open-tauri         # reveal the Linux installers in your file manager
+make open-tauri-win     # reveal the Windows installers
+make open-nwjs / open-dist
+```
+
+> **Windows + WebView2.** Tauri uses the OS webview — **WebView2** on Windows. Windows 11
+> and updated Windows 10 ship it, so the `.exe` just works there; the `-setup.exe` installer
+> bootstraps it on older systems (`webviewInstallMode: downloadBootstrapper`). Under **wine**
+> WebView2 is usually absent, so `make run-tauri-win` may error `Could not find the WebView2
+> Runtime`. That's a wine limitation, not a build defect. Try `make webview2-wine`
+> (experimental), test on real Windows/a VM, or run the **NW.js** Windows build instead —
+> `make run-nwjs-win` — which bundles Chromium and needs no WebView2.
 
 ## 📦 Runnable container for your app
 
