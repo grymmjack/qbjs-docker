@@ -27,7 +27,7 @@ single `.bas` file — the QBJS counterpart to [`qb64pe-docker`](https://github.
 | Output | How | Result |
 |--------|-----|--------|
 | 🌐 **Web bundle** | `qbjs-build.sh` | Static site (`dist/`) + **PWA** (installable, offline) → GitHub Pages |
-| 🖥️ **Native desktop app** | Tauri (modern) **or** NWJS (legacy) | `.exe`/`.msi`, `.AppImage`/`.deb`, `.dmg` |
+| 🖥️ **Native desktop app** | **Tauri** (tiny native), **Electron** (bundled Chromium), or NWJS (legacy) | `.exe`/`.msi`, `.AppImage`/`.deb`, `.dmg` |
 | 📦 **Runnable container** | `serve` mode | `docker run -p 8080:8080 my-app` |
 | ⚙️ **Just the JS** | `compile` mode | `program.js` for your own hosting |
 
@@ -39,26 +39,30 @@ graph LR
     B -->|"qbjs-build.sh + runtime + PWA"| C["dist/ web bundle"]
 
     C --> W["🌐 Web / PWA"]
-    C --> T["🖥️ Tauri (~3MB binary, OS webview)"]
+    C --> T["🖥️ Tauri (~3MB, OS webview)"]
+    C --> E["🖥️ Electron (~100MB, Chromium)"]
     C --> N["🖥️ NW.js (~100MB, Chromium)"]
     C --> S["📦 serve container"]
 
     W --> WP["GitHub Pages — installable, offline"]
     S --> SP["docker run :8080"]
 
-    T --> TL["🐧 Linux .AppImage / .deb — native"]
-    T --> TW["🪟 Windows .exe + NSIS setup — cargo-xwin cross-compile"]
-    T --> TM["🍎 macOS .dmg — macOS CI runner"]
+    T --> TL["🐧 Linux .deb/.rpm/.AppImage (x64+arm64)"]
+    T --> TW["🪟 Windows .exe/.msi (x64+arm64) — cargo-xwin"]
+    T --> TM["🍎 macOS universal .dmg — CI runner"]
 
-    N --> NL["🐧 Linux .tar.gz"]
-    N --> NW2["🪟 Windows .zip"]
-    N --> NM["🍎 macOS .tar.gz"]
+    E --> EL["🐧 Linux .AppImage/.deb (x64+arm64)"]
+    E --> EW["🪟 Windows nsis (x64+arm64)"]
+    E --> EM["🍎 macOS universal .dmg — CI runner"]
+
+    N --> NX["🐧🪟🍎 .tar.gz/.zip (x64, +macOS arm64)"]
 
     style A fill:#ec4899,stroke:#be185d,color:#fff
     style B fill:#8b5cf6,stroke:#6d28d9,color:#fff
     style C fill:#10b981,stroke:#059669,color:#fff
     style W fill:#0ea5e9,stroke:#0369a1,color:#fff
     style T fill:#1e293b,stroke:#475569,color:#fff
+    style E fill:#1e293b,stroke:#475569,color:#fff
     style N fill:#1e293b,stroke:#475569,color:#fff
     style S fill:#1e293b,stroke:#475569,color:#fff
 ```
@@ -157,17 +161,23 @@ require a user gesture). `auto` runs on load.
 
 ## 🖥️ Native desktop builds
 
-Both native paths wrap the **same** `dist/` bundle:
+All three native paths wrap the **same** `dist/` bundle — pick by trade-off:
 
-- **Tauri** (`templates/tauri/`) — modern, uses the OS webview. Measured for the demo app:
-  **3.4 MB binary**, **1.5 MB** `.deb`/`.rpm`. (A Linux `.AppImage` is ~98 MB because it's
-  fully self-contained — it bundles the GTK/WebKit libs; the `.deb`/`.rpm` rely on system
-  libs and stay tiny.)
-- **NWJS** (`bin/qbjs-nwjs.sh`) — legacy, ~100 MB, bundles Chromium. All three platforms
-  are packaged from a single Linux job (it just repackages each platform's NWJS runtime).
+| | Size | Rendering | Tooling | Best for |
+|---|------|-----------|---------|----------|
+| **Tauri** (`make tauri`) | **~3 MB** binary | OS webview (varies by OS) | Rust + Tauri CLI | smallest native app |
+| **Electron** (`make electron`) | ~100 MB | bundled Chromium (consistent) | **electron-builder** (installers, auto-update, signing) | robust distribution, familiar tooling |
+| **NWJS** (`make nwjs`) | ~100 MB | bundled Chromium | DIY | legacy / simplest |
 
-Change window title/size/fullscreen in `templates/tauri/src-tauri/tauri.conf.json` or
-`templates/nwjs/package.json`.
+- **Tauri** (`templates/tauri/`) — measured for the demo: **3.4 MB binary**, **1.5 MB** `.deb`/`.rpm`
+  (a Linux `.AppImage` is ~98 MB, self-contained). Compiles Rust per arch.
+- **Electron** (`templates/electron/`) — `electron-builder` with the same config shape as a
+  typical Electron app. Cross-**arch** is free (repackages prebuilt runtimes): one Linux run
+  makes AppImage + deb for **x64 and arm64**. Best installers + auto-update path.
+- **NWJS** (`bin/qbjs-nwjs.sh`) — repackages each platform's NWJS runtime from one Linux job.
+
+Change the window title/size in `templates/tauri/src-tauri/tauri.conf.json`,
+`templates/electron/main.js`, or `templates/nwjs/package.json`.
 
 ### Cross-platform targets (x64 + ARM64)
 
@@ -189,12 +199,14 @@ unavailable arch/OS combos automatically.
 Locally on an x86 Linux box you can build everything except native macOS and Linux-ARM64:
 
 ```bash
-make tauri          # Linux x64 desktop app
-make tauri-win      # Windows x64  (cargo-xwin)
-make tauri-win-arm  # Windows ARM64 (cargo-xwin)
+make tauri          # Tauri Linux x64
+make tauri-win      # Tauri Windows x64  (cargo-xwin)
+make tauri-win-arm  # Tauri Windows ARM64 (cargo-xwin)
+make electron       # Electron Linux x64 + arm64 (AppImage + deb)
+make electron-win   # Electron Windows (needs wine)
 make nwjs           # NW.js x64  (Linux/macOS/Windows)
-make nwjs-arm       # NW.js ARM64 (Linux/macOS/Windows)
-make all            # everything buildable here; macOS + Linux-ARM64 -> CI
+make nwjs-arm       # NW.js ARM64 (macOS only upstream)
+make all            # everything buildable here; macOS -> CI
 ```
 
 > **`aarch64` = Apple Silicon.** The macOS build is **universal**, so one `.dmg` runs on
@@ -215,6 +227,7 @@ make all            # everything buildable here; macOS + Linux-ARM64 -> CI
 
 ```bash
 make run-tauri          # run the Linux Tauri app
+make run-electron       # run the Linux Electron app (AppImage)
 make run-tauri-win      # run the Windows .exe (via wine; see WebView2 note below)
 make run-nwjs-linux     # extract + run the Linux NW.js package
 make run-nwjs-win       # run the Windows NW.js package under wine (self-contained)

@@ -5,6 +5,16 @@ All notable changes to qbjs-docker are documented here.
 ## [Unreleased]
 
 ### Added
+- **Electron as a first-class native target** (`templates/electron/`, `bin/qbjs-electron.sh`):
+  - `make electron` (Linux AppImage + deb, **x64 and arm64** from one run — Electron
+    cross-arch is just repackaging, no compilation), `make electron-win` (Windows nsis,
+    needs wine locally), `make run-electron` / `make open-electron`.
+  - CI `electron` job builds Linux / macOS (universal `.dmg`) / Windows (nsis x64+arm64);
+    `build-electron` input (default true). macOS is ad-hoc signed (`-c.mac.identity=-`)
+    with a `CSC_LINK` Developer ID path for full notarization.
+  - `electron-builder`-based, mirroring a standard Electron app config.
+
+### Also added
 - **`Makefile`** — one-command targets (`make web`/`serve`/`tauri`/`nwjs`/`test`/`clean`).
 - **`bin/qbjs-tauri.sh`** — scaffold + build a Tauri app around a `dist/` bundle; used by
   both `make tauri` and CI (single source of truth for config token substitution).

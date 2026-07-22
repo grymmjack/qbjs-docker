@@ -1,0 +1,36 @@
+appId: "{{APP_ID}}"
+productName: "{{APP_NAME}}"
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - main.js
+  - package.json
+  - dist/**
+
+# Icons: drop a 512x512+ PNG at build/icon.png (or icon.icns/.ico) to brand the
+# app. Left unset here so builds succeed with Electron's default icon.
+
+mac:
+  category: public.app-category.games
+  target:
+    - target: dmg
+      arch: universal        # one .dmg for Intel + Apple Silicon
+  # Signing: ad-hoc by default (passed at build time via -c.mac.identity=-) so
+  # no Apple account is needed. Provide CSC_LINK / CSC_KEY_PASSWORD (and notarize
+  # creds) to produce a fully-signed, notarized build -- same as Moebius.
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+
+linux:
+  category: Game
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]

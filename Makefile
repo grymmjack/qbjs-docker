@@ -1,4 +1,4 @@
-.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-win-arm tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win webview2-wine open open-tauri open-tauri-win open-nwjs open-dist nwjs nwjs-arm demo test clean clean-docker push
+.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-win-arm tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win run-electron webview2-wine open open-tauri open-tauri-win open-nwjs open-dist open-electron nwjs nwjs-arm electron electron-win electron-mac demo test clean clean-docker push
 
 # ---- Config (override on the command line, e.g. `make tauri SRC=my.bas NAME="My App"`) ----
 IMAGE       := qbjs-docker
@@ -18,6 +18,7 @@ LINUX_BUNDLE := tauri-app/src-tauri/target/release/bundle
 WIN_BIN      := tauri-win/src-tauri/target/$(WIN_TARGET)/release/qbjs-app.exe
 WIN_BUNDLE   := tauri-win/src-tauri/target/$(WIN_TARGET)/release/bundle
 NWJS_OUT     := out
+ELECTRON_OUT := electron-app/release
 
 # File-manager opener (xdg-open on Linux, open on macOS; falls back to echo)
 OPEN := $(shell command -v xdg-open 2>/dev/null || command -v open 2>/dev/null || echo echo)
@@ -97,15 +98,17 @@ tauri-mac: ## macOS build (cannot cross-compile from Linux -- use CI)
 tauri-all: tauri tauri-win ## Build both native Tauri targets locally (Linux + Windows)
 	@echo "Built Linux + Windows Tauri locally. macOS -> CI (see 'make tauri-mac')."
 
-all: tauri tauri-win tauri-win-arm nwjs nwjs-arm ## Build EVERYTHING buildable on this x86 Linux host; macOS + Linux-ARM via CI
+all: tauri tauri-win tauri-win-arm nwjs nwjs-arm electron electron-win ## Build EVERYTHING buildable on this x86 Linux host; macOS via CI
 	@echo ""
 	@echo "== Built locally (x86 Linux): =="
 	@echo "  web bundle            -> ./$(DIST)"
 	@echo "  Linux x64 Tauri       -> $(LINUX_BUNDLE)/"
 	@echo "  Windows x64 Tauri     -> $(WIN_BUNDLE)/"
 	@echo "  Windows ARM64 Tauri   -> tauri-win-arm/src-tauri/target/$(WIN_ARM_TARGET)/release/bundle/"
+	@echo "  Electron (Linux x64+arm64) -> $(ELECTRON_OUT)/"
+	@echo "  Electron (Windows)    -> electron-win/release/"
 	@echo "  NW.js x64 + arm64 (Lin/Mac/Win) -> ./$(NWJS_OUT)/"
-	@echo "  CI only: macOS universal .dmg, Linux ARM64 Tauri (see 'make tauri-mac')"
+	@echo "  CI only: macOS Tauri + Electron, Linux ARM64 Tauri"
 
 # ---- run: launch a built binary ------------------------------------------
 run-tauri: ## Run the Linux Tauri app
@@ -188,6 +191,30 @@ nwjs-arm: web ## Build native NW.js ARM64 packages (Linux/macOS/Windows) -> ./ou
 	done
 	@ls -lh out
 
+# ---- Electron (bundled Chromium; best installers via electron-builder) ----
+electron: web ## Build a native Electron app for Linux (x64+arm64) -> ./electron-app/release
+	@command -v node >/dev/null || { echo "Node not found."; exit 1; }
+	QBJS_TEMPLATES=templates bin/qbjs-electron.sh \
+	  --dist "$(DIST)" --name "$(NAME)" --out electron-app --platform linux --build
+
+electron-win: web ## Cross-build a Windows Electron installer from Linux (needs wine)
+	@command -v wine >/dev/null 2>&1 || echo "Tip: install 'wine' to build the Windows installer from Linux."
+	QBJS_TEMPLATES=templates bin/qbjs-electron.sh \
+	  --dist "$(DIST)" --name "$(NAME)" --out electron-win --platform win --build
+
+electron-mac: ## macOS Electron .dmg (needs a macOS host -> use CI)
+	@echo "macOS Electron .dmg must be built on macOS (electron-builder --mac)."
+	@echo "Use the CI matrix (reusable-build.yml) or run 'make electron' on a Mac."
+
+run-electron: ## Run the built Linux Electron app (AppImage)
+	@a=$$(ls $(ELECTRON_OUT)/*.AppImage 2>/dev/null | head -1); \
+	[ -n "$$a" ] || { echo "Not built yet. Run: make electron"; exit 1; }; \
+	chmod +x "$$a"; "$$a"
+
+open-electron: ## Open the Electron installers folder
+	@[ -d "$(ELECTRON_OUT)" ] || { echo "Not built yet. Run: make electron"; exit 1; }
+	$(OPEN) "$(ELECTRON_OUT)"
+
 demo: web ## Build the sample and serve it (one command to see it run)
 	@$(MAKE) serve
 
@@ -198,8 +225,9 @@ test: image ## Run the end-to-end pipeline test
 	@test -f workspace/dist/index.html && echo "PASS: web bundle built"
 	@rm -rf workspace/dist
 
-clean: ## Remove build artifacts (dist, out, tauri-app, program.js)
-	rm -rf $(DIST) out tauri-app workspace/dist workspace/*.js program.js
+clean: ## Remove build artifacts (dist, out, tauri-*, electron-*, program.js)
+	rm -rf $(DIST) out tauri-app tauri-win tauri-win-arm electron-app electron-win \
+	  workspace/dist workspace/*.js program.js
 	@echo "Cleaned."
 
 clean-docker: ## Remove the local Docker image

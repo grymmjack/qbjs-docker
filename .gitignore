@@ -11,7 +11,12 @@ workspace/dist/
 # Tauri scaffold/build workspaces created by qbjs-tauri.sh / make tauri*
 tauri-app/
 tauri-win/
+tauri-win-arm/
 tauri-mac/
+
+# Electron scaffold/build workspaces created by qbjs-electron.sh / make electron*
+electron-app/
+electron-win/
 
 # Native build artifacts
 **/target/

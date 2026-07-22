@@ -1,0 +1,16 @@
+{
+  "name": "qbjs-electron-app",
+  "version": "{{APP_VERSION}}",
+  "description": "A QBJS application packaged as a native desktop app with Electron.",
+  "homepage": "https://qbjs.org",
+  "author": "QBJS <noreply@qbjs.org>",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
