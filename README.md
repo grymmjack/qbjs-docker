@@ -31,6 +31,36 @@ single `.bas` file — the QBJS counterpart to [`qb64pe-docker`](https://github.
 | 📦 **Runnable container** | `serve` mode | `docker run -p 8080:8080 my-app` |
 | ⚙️ **Just the JS** | `compile` mode | `program.js` for your own hosting |
 
+## 🚀 Install
+
+One line clones the repo and makes sure `make` is ready:
+
+**Linux / macOS**
+```bash
+curl -fsSL https://raw.githubusercontent.com/grymmjack/qbjs-docker/main/install.sh | sh
+```
+
+**Windows** — PowerShell
+```powershell
+irm https://raw.githubusercontent.com/grymmjack/qbjs-docker/main/install.ps1 | iex
+```
+
+Then build and see it run:
+```bash
+cd ~/qbjs-docker && make check && make demo
+```
+
+Override where it clones with `QBJS_DIR`, or the branch/tag with `QBJS_REF`.
+
+<details>
+<summary>Rather not pipe a remote script into your shell? (or want to read it first)</summary>
+
+Do it by hand — same result, nothing hidden. On Windows, run this inside WSL / MSYS2 / Git Bash:
+```bash
+git clone https://github.com/grymmjack/qbjs-docker && cd qbjs-docker && ./bootstrap.sh
+```
+</details>
+
 ## 🏗️ Architecture
 
 ```mermaid
