@@ -207,9 +207,14 @@ electron-mac: ## macOS Electron .dmg (needs a macOS host -> use CI)
 	@echo "Use the CI matrix (reusable-build.yml) or run 'make electron' on a Mac."
 
 run-electron: ## Run the built Linux Electron app (AppImage)
-	@a=$$(ls $(ELECTRON_OUT)/*.AppImage 2>/dev/null | head -1); \
-	[ -n "$$a" ] || { echo "Not built yet. Run: make electron"; exit 1; }; \
-	chmod +x "$$a"; "$$a"
+	@case "$$(uname -m)" in \
+	  x86_64|amd64) arch=x86_64 ;; \
+	  aarch64|arm64) arch=arm64 ;; \
+	  *) arch="$$(uname -m)" ;; \
+	esac; \
+	a=$$(ls $(ELECTRON_OUT)/*$$arch*.AppImage 2>/dev/null | head -1); \
+	[ -n "$$a" ] || { echo "No $$arch AppImage in $(ELECTRON_OUT). Run: make electron"; exit 1; }; \
+	echo "Running: $$a"; chmod +x "$$a"; "$$a"
 
 open-electron: ## Open the Electron installers folder
 	@[ -d "$(ELECTRON_OUT)" ] || { echo "Not built yet. Run: make electron"; exit 1; }
