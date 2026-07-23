@@ -13,24 +13,6 @@
 
 ---
 
-QBJS transpiles QBasic/QB64-style BASIC into **JavaScript** that runs in a browser.
-This project wraps QBJS's headless Node compiler in a tiny Docker image plus a set of
-GitHub Actions, so you can build **"ready to run"** QBJS apps for every target from a
-single `.bas` file — the QBJS counterpart to [`qb64pe-docker`](https://github.com/grymmjack/qb64pe-docker).
-
-> **Why not WebAssembly?** QBJS already emits JavaScript, which browsers run natively —
-> there's nothing to "upgrade" to WASM. The modern targets are a **PWA** for the web and
-> **Tauri** for a small native exe (the NWJS replacement). See [Architecture](#-architecture).
-
-## ✨ What you get
-
-| Output | How | Result |
-|--------|-----|--------|
-| 🌐 **Web bundle** | `qbjs-build.sh` | Static site (`dist/`) + **PWA** (installable, offline) → GitHub Pages |
-| 🖥️ **Native desktop app** | **Tauri** (tiny native), **Electron** (bundled Chromium), or NWJS (legacy) | `.exe`/`.msi`, `.AppImage`/`.deb`, `.dmg` |
-| 📦 **Runnable container** | `serve` mode | `docker run -p 8080:8080 my-app` |
-| ⚙️ **Just the JS** | `compile` mode | `program.js` for your own hosting |
-
 ## 🚀 Install
 
 One line clones the repo and makes sure `make` is ready:
@@ -60,6 +42,26 @@ Do it by hand — same result, nothing hidden. On Windows, run this inside WSL /
 git clone https://github.com/grymmjack/qbjs-docker && cd qbjs-docker && ./bootstrap.sh
 ```
 </details>
+
+---
+
+QBJS transpiles QBasic/QB64-style BASIC into **JavaScript** that runs in a browser.
+This project wraps QBJS's headless Node compiler in a tiny Docker image plus a set of
+GitHub Actions, so you can build **"ready to run"** QBJS apps for every target from a
+single `.bas` file — the QBJS counterpart to [`qb64pe-docker`](https://github.com/grymmjack/qb64pe-docker).
+
+> **Why not WebAssembly?** QBJS already emits JavaScript, which browsers run natively —
+> there's nothing to "upgrade" to WASM. The modern targets are a **PWA** for the web and
+> **Tauri** for a small native exe (the NWJS replacement). See [Architecture](#-architecture).
+
+## ✨ What you get
+
+| Output | How | Result |
+|--------|-----|--------|
+| 🌐 **Web bundle** | `qbjs-build.sh` | Static site (`dist/`) + **PWA** (installable, offline) → GitHub Pages |
+| 🖥️ **Native desktop app** | **Tauri** (tiny native), **Electron** (bundled Chromium), or NWJS (legacy) | `.exe`/`.msi`, `.AppImage`/`.deb`, `.dmg` |
+| 📦 **Runnable container** | `serve` mode | `docker run -p 8080:8080 my-app` |
+| ⚙️ **Just the JS** | `compile` mode | `program.js` for your own hosting |
 
 ## 🏗️ Architecture
 
