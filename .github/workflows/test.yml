@@ -7,6 +7,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  makefile-selftest:
+    name: Makefile self-test (lint + logic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax check (bootstrap + self-test scripts)
+        run: |
+          sh -n bootstrap.sh
+          bash -n bin/check.sh
+
+      - name: Bootstrap verifies GNU make is present
+        run: ./bootstrap.sh
+
+      - name: make check (lint + dry-run + recipe logic)
+        run: make check
+
   build-and-test:
     name: Build image & test pipeline
     runs-on: ubuntu-latest

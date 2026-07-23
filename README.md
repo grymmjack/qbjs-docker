@@ -126,6 +126,34 @@ docker compose run --rm build workspace/bubble-universe.bas --name "Bubble Unive
 docker compose up serve      # http://localhost:8080
 ```
 
+### First run (get `make` ready)
+
+The build is a **GNU make + Unix-shell** toolchain, so a fresh machine needs
+`make` present first. The bootstrap scripts check for it (and report your other
+tools), and tell you exactly what to install:
+
+| Your machine | Run this | What it does |
+|--------------|----------|--------------|
+| **Linux / macOS** | `./bootstrap.sh` | Detects your package manager, ensures **GNU** make (add `--install` to install it) |
+| **Windows — Git Bash / MSYS2** | `./bootstrap.sh` | Same script; installs make via `pacman` where available |
+| **Windows — PowerShell / cmd** | `bootstrap.cmd` | Steers you into **WSL** (recommended) or MSYS2, then hands off to `bootstrap.sh` |
+
+> **Windows note:** the recipes are Unix shell (`ls`, `tar`, `docker`, …), so you
+> build **inside WSL / MSYS2 / Git Bash**, not native cmd — Windows binaries are
+> cross-compiled from there. Don't install a native `make.exe`: it can't run the recipes.
+
+Then verify your setup and see the sample run:
+
+```bash
+./bootstrap.sh      # ensure GNU make (Linux/macOS; or bootstrap.cmd on Windows)
+make check          # fast self-test of the Makefile -- no builds, ~seconds
+make demo           # build the sample and serve it
+```
+
+`make check` lints the Makefile, dry-runs every target, and unit-tests the
+`run-*`/`open-*` recipe logic — a quick guard that the targets are wired
+correctly on your machine before you kick off a real build.
+
 ### One-command builds with `make`
 
 Every target is a single command. Override `SRC=` / `NAME=` as needed
@@ -180,6 +208,7 @@ Every target is a single command. Override `SRC=` / `NAME=` as needed
 | Target | Description |
 |--------|-------------|
 | `make all` | Everything buildable on this host (macOS → CI) |
+| `make check` | Self-test the Makefile (lint + dry-run + recipe logic; no builds) |
 | `make test` | End-to-end pipeline check |
 | `make clean` / `clean-docker` | Remove build artifacts / the Docker image |
 | `make push` | Tag & push the image to GHCR |

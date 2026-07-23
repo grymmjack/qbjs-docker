@@ -1,4 +1,4 @@
-.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-win-arm tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win run-electron webview2-wine open open-tauri open-tauri-win open-nwjs open-dist open-electron nwjs nwjs-arm electron electron-win electron-mac demo test clean clean-docker push
+.PHONY: help image build web serve compile tauri tauri-deps tauri-win tauri-win-deps tauri-win-arm tauri-mac tauri-all all run run-tauri run-tauri-linux run-tauri-win run-nwjs run-nwjs-linux run-nwjs-win run-electron webview2-wine open open-tauri open-tauri-win open-nwjs open-dist open-electron nwjs nwjs-arm electron electron-win electron-mac demo test check clean clean-docker push
 
 # ---- Config (override on the command line, e.g. `make tauri SRC=my.bas NAME="My App"`) ----
 IMAGE       := qbjs-docker
@@ -131,8 +131,14 @@ run-tauri-win: ## Run the Windows Tauri .exe (wine; needs WebView2 - see note)
 	else "./$(WIN_BIN)"; fi
 
 run-nwjs-linux: ## Extract + run the Linux NW.js package
-	@a=$$(ls $(NWJS_OUT)/*-linux-x64.tar.gz 2>/dev/null | head -1); \
-	[ -n "$$a" ] || { echo "Not built yet. Run: make nwjs"; exit 1; }; \
+	@case "$$(uname -m)" in \
+	  x86_64|amd64) arch=x64 ;; \
+	  aarch64|arm64) arch=arm64 ;; \
+	  *) arch="$$(uname -m)" ;; \
+	esac; \
+	a=$$(ls $(NWJS_OUT)/*-linux-$$arch.tar.gz 2>/dev/null | head -1); \
+	[ -n "$$a" ] || { echo "No $$arch Linux NW.js package in $(NWJS_OUT). Build x64 with 'make nwjs'. (NW.js ships no linux-arm64 -- use 'make electron'/'make tauri' for arm64.)"; exit 1; }; \
+	[ -n "$(RUN_PICK_ONLY)" ] && { echo "$$a"; exit 0; } || :; \
 	d=$$(mktemp -d); tar -xzf "$$a" -C "$$d"; \
 	nw=$$(find "$$d" -maxdepth 2 -name nw -type f | head -1); \
 	echo "Running $$(basename "$$a") ..."; (cd "$$(dirname "$$nw")" && ./nw)
@@ -140,8 +146,14 @@ run-nwjs-linux: ## Extract + run the Linux NW.js package
 run-nwjs: run-nwjs-linux ## Alias for run-nwjs-linux
 
 run-nwjs-win: ## Extract + run the Windows NW.js package (wine; self-contained, no WebView2)
-	@a=$$(ls $(NWJS_OUT)/*-win-x64.zip 2>/dev/null | head -1); \
-	[ -n "$$a" ] || { echo "Not built yet. Run: make nwjs"; exit 1; }; \
+	@case "$$(uname -m)" in \
+	  x86_64|amd64) arch=x64 ;; \
+	  aarch64|arm64) arch=arm64 ;; \
+	  *) arch="$$(uname -m)" ;; \
+	esac; \
+	a=$$(ls $(NWJS_OUT)/*-win-$$arch.zip 2>/dev/null | head -1); \
+	[ -n "$$a" ] || { echo "No $$arch Windows NW.js package in $(NWJS_OUT). Build x64 with 'make nwjs'. (NW.js ships no win-arm64 -- use 'make electron-win'/'make tauri-win-arm' for arm64.)"; exit 1; }; \
+	[ -n "$(RUN_PICK_ONLY)" ] && { echo "$$a"; exit 0; } || :; \
 	command -v wine >/dev/null 2>&1 || { echo "Install 'wine' to run the Windows package here."; exit 1; }; \
 	d=$$(mktemp -d); unzip -q "$$a" -d "$$d"; \
 	exe=$$(find "$$d" -maxdepth 2 -name nw.exe | head -1); \
@@ -214,6 +226,7 @@ run-electron: ## Run the built Linux Electron app (AppImage)
 	esac; \
 	a=$$(ls $(ELECTRON_OUT)/*$$arch*.AppImage 2>/dev/null | head -1); \
 	[ -n "$$a" ] || { echo "No $$arch AppImage in $(ELECTRON_OUT). Run: make electron"; exit 1; }; \
+	[ -n "$(RUN_PICK_ONLY)" ] && { echo "$$a"; exit 0; } || :; \
 	echo "Running: $$a"; chmod +x "$$a"; "$$a"
 
 open-electron: ## Open the Electron installers folder
@@ -229,6 +242,9 @@ test: image ## Run the end-to-end pipeline test
 	  $(IMAGE):$(TAG) build bubble-universe.bas --name "Test"
 	@test -f workspace/dist/index.html && echo "PASS: web bundle built"
 	@rm -rf workspace/dist
+
+check: ## Self-test the Makefile (lint + dry-run + recipe logic; no heavy builds)
+	@bin/check.sh
 
 clean: ## Remove build artifacts (dist, out, tauri-*, electron-*, program.js)
 	rm -rf $(DIST) out tauri-app tauri-win tauri-win-arm electron-app electron-win \
