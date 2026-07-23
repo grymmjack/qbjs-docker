@@ -29,6 +29,9 @@ win:
 
 linux:
   category: Game
+  # Name every Linux artifact after the product (not the package name), so the
+  # .deb matches the .AppImage: "Bubble Universe_1.0.0_x64.deb" etc.
+  artifactName: "${productName}_${version}_${arch}.${ext}"
   target:
     - target: AppImage
       arch: [x64, arm64]
