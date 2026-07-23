@@ -1,0 +1,93 @@
+name: Bootstrap & self-test
+
+# On-demand cross-platform verification of the first-run experience:
+#   - bootstrap.sh   (Linux / macOS / MSYS2)  ensures GNU make
+#   - make check     (the Makefile self-test)  runs everywhere
+#   - bootstrap.ps1 / bootstrap.cmd            parse + run under Windows PowerShell 5.1
+#
+# This is deliberately NOT on every push (macOS/Windows runners are costly).
+# Trigger it explicitly:
+#   * the "Run workflow" button (workflow_dispatch), or
+#   * push a tag matching test-bootstrap-check*  e.g.  git tag test-bootstrap-check-1 && git push --tags
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'test-bootstrap-check*'
+
+concurrency:
+  group: bootstrap-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- Linux + macOS: bootstrap.sh is POSIX sh; make check is bash-3.2 safe ----
+  unix:
+    name: bootstrap + make check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax check
+        run: |
+          sh -n bootstrap.sh
+          bash -n bin/check.sh
+
+      - name: Bootstrap ensures GNU make
+        run: ./bootstrap.sh
+
+      - name: make check
+        run: make check
+
+  # ---- Windows via MSYS2: the supported "Unix shell on Windows" path ----------
+  windows-msys2:
+    name: bootstrap + make check (windows / msys2)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: 'msys2 {0}'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          update: false
+          install: make
+
+      - name: Shell syntax check
+        run: |
+          sh -n bootstrap.sh
+          bash -n bin/check.sh
+
+      - name: Bootstrap ensures GNU make (MSYS2 path)
+        run: ./bootstrap.sh
+
+      - name: make check
+        run: make check
+
+  # ---- Windows PowerShell 5.1: validate the .ps1/.cmd entry chain -------------
+  windows-powershell:
+    name: bootstrap.ps1 (windows / powershell 5.1)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse-check bootstrap.ps1 under Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $errs = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            "$env:GITHUB_WORKSPACE\bootstrap.ps1", [ref]$null, [ref]$errs)
+          if ($errs -and $errs.Count -gt 0) {
+            $errs | ForEach-Object { Write-Host "  $($_.Message)" }
+            exit 1
+          }
+          Write-Host "bootstrap.ps1 parses clean under PS $($PSVersionTable.PSVersion)"
+
+      - name: Run bootstrap.cmd -Help (validates the .cmd -> .ps1 chain)
+        shell: cmd
+        run: bootstrap.cmd -Help

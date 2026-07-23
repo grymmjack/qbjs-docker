@@ -49,12 +49,15 @@ expect() {
 
 # ---- discover targets straight from the Makefile --------------------------
 # Documented targets are the source of truth: `name: ... ## description`.
-mapfile -t DOCUMENTED < <(grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*## ' "$MK" | sed 's/:.*//' | sort -u)
+# Kept as a newline-separated list (not a bash array) so this runs on macOS's
+# bash 3.2 too -- target names are single words, so `for t in $DOCUMENTED` is safe.
+DOCUMENTED=$(grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*## ' "$MK" | sed 's/:.*//' | sort -u)
+DOC_COUNT=$(printf '%s\n' "$DOCUMENTED" | grep -c .)
 # The .PHONY declaration (single line here) lists intended phony targets.
 PHONY=$(grep -E '^\.PHONY:' "$MK" | sed 's/^\.PHONY://')
 
 printf '%sqbjs-docker Makefile self-test%s  (%d documented targets)\n' \
-  "$B" "$Z" "${#DOCUMENTED[@]}"
+  "$B" "$Z" "$DOC_COUNT"
 
 # ===========================================================================
 # 0. host tools -- answers "is my environment able to build?" (informational)
@@ -73,17 +76,17 @@ done
 # 1. lint -- .PHONY completeness (catches "added a target, forgot .PHONY")
 # ===========================================================================
 sect "lint: .PHONY completeness"
-for t in "${DOCUMENTED[@]}"; do
+for t in $DOCUMENTED; do
   case " $PHONY " in
     *" $t "*) : ;;
     *) bad ".PHONY is missing '$t'" ;;
   esac
 done
-[ "$fail" -eq 0 ] && ok "all ${#DOCUMENTED[@]} documented targets are in .PHONY"
+[ "$fail" -eq 0 ] && ok "all $DOC_COUNT documented targets are in .PHONY"
 # Reverse: a .PHONY entry with no rule is a typo waiting to bite.
 for p in $PHONY; do
   found=
-  for t in "${DOCUMENTED[@]}"; do [ "$p" = "$t" ] && { found=1; break; }; done
+  for t in $DOCUMENTED; do [ "$p" = "$t" ] && { found=1; break; }; done
   [ -n "$found" ] || info ".PHONY lists '$p' but it has no documented rule"
 done
 
@@ -92,10 +95,10 @@ done
 #    Safe even for all/clean/push: -n prints, never executes.
 # ===========================================================================
 sect "dry-run: recipe/variable expansion"
-for t in "${DOCUMENTED[@]}"; do
+for t in $DOCUMENTED; do
   if make -n "$t" >/dev/null 2>&1; then :; else bad "make -n $t failed"; fi
 done
-[ "$fail" -eq 0 ] && ok "all ${#DOCUMENTED[@]} targets expand under make -n"
+[ "$fail" -eq 0 ] && ok "all $DOC_COUNT targets expand under make -n"
 
 # ===========================================================================
 # 3. echo-only -- informational targets run for real and exit 0
